@@ -1,4 +1,4 @@
-# ⚔️ TitanEconomy
+#  TitanEconomy
 
 ![Version](https://img.shields.io/badge/version-1.0-blue.svg) ![Java](https://img.shields.io/badge/Java-21-orange) ![PaperMC](https://img.shields.io/badge/Server-PaperMC-green)
 
@@ -6,19 +6,19 @@
 
 ---
 
-## ✨ Features
+##  Features
 
-* **💰 Advanced Economy:** Secure balance management with Vault support.
-* **🛒 GUI Shop:** Configurable category-based shop with `x1`, `x32`, `x64` quantity selection.
-* **⚖️ Auction House:** Global `/ah` system for players to sell items to each other.
-* **📈 RPG Leveling:** Earn XP by killing mobs/mining. Higher levels = Higher money multipliers!
-* **💵 Bank Notes:** Withdraw physical money items to trade or store securely.
-* **📊 Scoreboard HUD:** Lag-free sidebar display for Balance, Level, and Server Name.
-* **🏆 Leaderboards:** View the richest players with `/baltop`.
+* ** Advanced Economy:** Secure balance management with Vault support.
+* ** GUI Shop:** Configurable category-based shop with `x1`, `x32`, `x64` quantity selection.
+* ** Auction House:** Global `/ah` system for players to sell items to each other.
+* ** RPG Leveling:** Earn XP by killing mobs/mining. Higher levels = Higher money multipliers!
+* ** Bank Notes:** Withdraw physical money items to trade or store securely.
+* ** Scoreboard HUD:** Lag-free sidebar display for Balance, Level, and Server Name.
+* ** Leaderboards:** View the richest players with `/baltop`.
 
 ---
 
-## 📥 Installation
+##  Installation
 
 1.  Download the `TitanEconomy.jar`.
 2.  Place it in your server's `plugins` folder.
@@ -27,9 +27,9 @@
 
 ---
 
-## 📜 Commands & Permissions
+##  Commands & Permissions
 
-### 🟢 Player Commands
+###  Player Commands
 | Command | Description |
 | :--- | :--- |
 | `/bal` | Check your current wallet balance. |
@@ -40,7 +40,7 @@
 | `/ah sell <price>` | Sell the item in your hand on the Auction House. |
 | `/baltop` | View the top 10 richest players. |
 
-### 🔴 Admin Commands (Requires `titaneconomy.admin`)
+###  Admin Commands (Requires `titaneconomy.admin`)
 | Command | Description |
 | :--- | :--- |
 | `/eco give <player> <amt>` | Add money to a player's account. |
@@ -49,7 +49,7 @@
 
 ---
 
-## ⚙️ Configuration
+##  Configuration
 
 ### Adding Items to Shop
 You can add unlimited items via `src/main/resources/shops.yml`.
