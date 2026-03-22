@@ -57,15 +57,8 @@ public class ShopListener implements Listener {
 
             if (shopManager.menuItemsCache.containsKey(title)) {
                 if (shopManager.menuItemsCache.get(title).containsKey(slot)) {
-                    String itemKey = shopManager.menuItemsCache.get(title).get(slot);
-                    String catId = title.replace("Shop: ", "").toLowerCase();
-                    // Exception handling for weird titles
-                    if(catId.contains("armor")) catId = "armor"; 
-                    
-                    String path = "menus." + catId + ".items." + itemKey;
-                    
-                    // OPEN QUANTITY MENU INSTEAD OF BUYING
-                    shopManager.openQuantityMenu(player, path);
+                    String itemPath = shopManager.menuItemsCache.get(title).get(slot);
+                    shopManager.openQuantityMenu(player, itemPath);
                     player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
                 }
             }
@@ -78,6 +71,7 @@ public class ShopListener implements Listener {
             int slot = event.getSlot();
 
             if (slot == 22) { // Cancel Button
+                shopManager.pendingPurchase.remove(player.getUniqueId());
                 player.closeInventory(); 
                 // Optional: Re-open category, but closing is safer to avoid loops
                 return;
@@ -89,7 +83,7 @@ public class ShopListener implements Listener {
             }
 
             String itemPath = shopManager.pendingPurchase.get(player.getUniqueId());
-            double unitPrice = shopManager.getConfig().getDouble(itemPath + ".price");
+            double unitPrice = shopManager.getBuyPrice(itemPath);
             String matName = shopManager.getConfig().getString(itemPath + ".material");
             Material mat = Material.valueOf(matName);
 
@@ -105,10 +99,11 @@ public class ShopListener implements Listener {
                     if (hasSpace(player, amount)) {
                         economyManager.withdraw(player, finalPrice);
                         player.getInventory().addItem(new ItemStack(mat, amount));
+                        shopManager.pendingPurchase.remove(player.getUniqueId());
 
                         player.sendMessage(Component.text("Bought " + amount + "x ", NamedTextColor.GREEN)
                             .append(Component.text(mat.name(), NamedTextColor.YELLOW))
-                            .append(Component.text(" for $" + finalPrice, NamedTextColor.GREEN)));
+                            .append(Component.text(" for $" + shopManager.formatPrice(finalPrice), NamedTextColor.GREEN)));
                         
                         player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 2.0f);
                         plugin.getScoreboardManager().updateScoreboard(player);
@@ -118,7 +113,7 @@ public class ShopListener implements Listener {
                         player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
                     }
                 } else {
-                    player.sendMessage(Component.text("Need $" + finalPrice, NamedTextColor.RED));
+                    player.sendMessage(Component.text("Need $" + shopManager.formatPrice(finalPrice), NamedTextColor.RED));
                     player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
                 }
             }

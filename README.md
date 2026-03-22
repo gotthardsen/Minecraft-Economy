@@ -60,3 +60,13 @@ You can add unlimited items via `src/main/resources/shops.yml`.
     slot: 12              # Slot in GUI (0-53)
     price: 100.0          # Price per 1 unit
     name: "&6Golden Apple" # Display Name
+```
+
+### Scoreboard Configuration
+You can customize the scoreboard title and footer in `src/main/resources/config.yml`.
+
+```yaml
+scoreboard:
+  header: "  &6&lTITAN NETWORK  "
+  footer: "&6play.titan.com"
+```
