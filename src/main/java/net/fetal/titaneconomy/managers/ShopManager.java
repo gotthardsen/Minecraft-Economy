@@ -16,13 +16,21 @@ import org.bukkit.inventory.meta.ItemMeta;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.Locale;
 import java.util.UUID;
 
 public class ShopManager {
     private static final double DEFAULT_SELL_MULTIPLIER = 0.20D;
+    private static final String SELL_MENU_TITLE = "&8Sell Items";
+    private static final int SELL_MENU_SIZE = 45;
+    private static final int SELL_CANCEL_SLOT = 39;
+    private static final int SELL_SUMMARY_SLOT = 40;
+    private static final int SELL_CONFIRM_SLOT = 41;
 
     private final TitanEconomy plugin;
     private File shopFile;
@@ -34,6 +42,7 @@ public class ShopManager {
     
     // Tracks which item a player selected before the quantity menu opens.
     public final HashMap<UUID, String> pendingPurchase = new HashMap<>();
+    private final HashMap<UUID, HashSet<Integer>> sellSelections = new HashMap<>();
 
     public ShopManager(TitanEconomy plugin) {
         this.plugin = plugin;
@@ -160,6 +169,103 @@ public class ShopManager {
         player.openInventory(inv);
     }
 
+    public void openSellMenu(Player player) {
+        clearSellSelection(player.getUniqueId());
+        Inventory inv = Bukkit.createInventory(null, SELL_MENU_SIZE, color(SELL_MENU_TITLE));
+        populateSellMenu(player, inv);
+        player.openInventory(inv);
+    }
+
+    public boolean isSellMenu(String title) {
+        return SELL_MENU_TITLE.equals(title);
+    }
+
+    public boolean isSellMenuSlot(int slot) {
+        return slot >= 0 && slot < 36;
+    }
+
+    public int getPlayerInventorySlotFromSellMenuSlot(int slot) {
+        if (slot < 0 || slot >= 36) {
+            return -1;
+        }
+        if (slot < 27) {
+            return slot + 9;
+        }
+        return slot - 27;
+    }
+
+    public int getSellCancelSlot() {
+        return SELL_CANCEL_SLOT;
+    }
+
+    public int getSellConfirmSlot() {
+        return SELL_CONFIRM_SLOT;
+    }
+
+    public void toggleSellSelection(Player player, int menuSlot) {
+        int playerSlot = getPlayerInventorySlotFromSellMenuSlot(menuSlot);
+        if (playerSlot < 0) {
+            return;
+        }
+
+        ItemStack item = player.getInventory().getItem(playerSlot);
+        if (!isSellable(item)) {
+            return;
+        }
+
+        HashSet<Integer> selectedSlots = sellSelections.computeIfAbsent(player.getUniqueId(), key -> new HashSet<>());
+        if (!selectedSlots.add(playerSlot)) {
+            selectedSlots.remove(playerSlot);
+        }
+    }
+
+    public void refreshSellMenu(Player player, Inventory inventory) {
+        populateSellMenu(player, inventory);
+    }
+
+    public void clearSellSelection(UUID playerId) {
+        sellSelections.remove(playerId);
+    }
+
+    public Set<Integer> getSelectedSellSlots(UUID playerId) {
+        Set<Integer> selected = sellSelections.get(playerId);
+        if (selected == null) {
+            return Collections.emptySet();
+        }
+        return new HashSet<>(selected);
+    }
+
+    public boolean isSellable(ItemStack item) {
+        if (item == null || item.getType() == Material.AIR) {
+            return false;
+        }
+        return findItemPathByMaterial(item.getType()) != null;
+    }
+
+    public double getSellValue(ItemStack item) {
+        if (!isSellable(item)) {
+            return 0.0D;
+        }
+        String itemPath = findItemPathByMaterial(item.getType());
+        return getSellPrice(itemPath) * item.getAmount();
+    }
+
+    public double sellInventorySlot(Player player, int playerSlot) {
+        ItemStack item = player.getInventory().getItem(playerSlot);
+        if (!isSellable(item)) {
+            return 0.0D;
+        }
+
+        double total = getSellValue(item);
+        if (total <= 0.0D) {
+            return 0.0D;
+        }
+
+        player.getInventory().setItem(playerSlot, null);
+        plugin.getEconomyManager().deposit(player, total);
+        return total;
+    }
+
     private ItemStack createGuiItem(Material mat, String name, List<String> lore) {
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
@@ -173,6 +279,93 @@ public class ShopManager {
             item.setItemMeta(meta);
         }
         return item;
+    }
+
+    private void populateSellMenu(Player player, Inventory inv) {
+        inv.clear();
+        Set<Integer> selectedSlots = getSelectedSellSlots(player.getUniqueId());
+
+        for (int menuSlot = 0; menuSlot < 36; menuSlot++) {
+            int playerSlot = getPlayerInventorySlotFromSellMenuSlot(menuSlot);
+            ItemStack playerItem = player.getInventory().getItem(playerSlot);
+            inv.setItem(menuSlot, createSellPreviewItem(playerItem, selectedSlots.contains(playerSlot)));
+        }
+
+        for (int slot = 36; slot < 45; slot++) {
+            inv.setItem(slot, createGuiItem(Material.GRAY_STAINED_GLASS_PANE, "&8 ", List.of()));
+        }
+
+        inv.setItem(SELL_CANCEL_SLOT, createGuiItem(Material.BARRIER, "&cCancel", List.of("&7Close the sell menu")));
+        inv.setItem(SELL_SUMMARY_SLOT, createSelectionSummary(player, selectedSlots));
+        inv.setItem(SELL_CONFIRM_SLOT, createGuiItem(Material.EMERALD_BLOCK, "&aSell Selected", List.of(
+            "&7Selected Slots: &f" + selectedSlots.size(),
+            "&7Total Value: &a$" + formatPrice(getSelectedSellValue(player, selectedSlots)),
+            "",
+            "&eClick to confirm the sale"
+        )));
+    }
+
+    private ItemStack createSellPreviewItem(ItemStack item, boolean selected) {
+        if (item == null || item.getType() == Material.AIR) {
+            return null;
+        }
+
+        if (!isSellable(item)) {
+            return createStatusPane(Material.RED_STAINED_GLASS_PANE, item.getAmount(), "&cCannot Sell", List.of(
+                "&7Item: &f" + formatMaterialName(item.getType()),
+                "&7Amount: &f" + item.getAmount(),
+                "",
+                "&cThis item is not in the shop"
+            ));
+        }
+
+        if (selected) {
+            return createStatusPane(Material.LIME_STAINED_GLASS_PANE, item.getAmount(), "&aSelected", List.of(
+                "&7Item: &f" + formatMaterialName(item.getType()),
+                "&7Amount: &f" + item.getAmount(),
+                "&7Total Sell Value: &a$" + formatPrice(getSellValue(item)),
+                "",
+                "&eClick again to deselect"
+            ));
+        }
+
+        ItemStack preview = item.clone();
+        ItemMeta meta = preview.getItemMeta();
+        if (meta != null) {
+            List<Component> lore = new ArrayList<>();
+            if (meta.lore() != null) {
+                lore.addAll(meta.lore());
+                lore.add(color(""));
+            }
+            lore.add(color("&7Sell Each: &c$" + formatPrice(getSellPrice(findItemPathByMaterial(item.getType())))));
+            lore.add(color("&7Total Sell Value: &a$" + formatPrice(getSellValue(item))));
+            lore.add(color(""));
+            lore.add(color("&eClick to select this slot"));
+            meta.lore(lore);
+            preview.setItemMeta(meta);
+        }
+        return preview;
+    }
+
+    private ItemStack createStatusPane(Material paneMaterial, int amount, String name, List<String> lore) {
+        ItemStack item = createGuiItem(paneMaterial, name, lore);
+        item.setAmount(Math.max(1, Math.min(amount, paneMaterial.getMaxStackSize())));
+        return item;
+    }
+
+    private ItemStack createSelectionSummary(Player player, Set<Integer> selectedSlots) {
+        return createGuiItem(Material.PAPER, "&fSelection Summary", List.of(
+            "&7Selected Slots: &f" + selectedSlots.size(),
+            "&7Total Value: &a$" + formatPrice(getSelectedSellValue(player, selectedSlots))
+        ));
+    }
+
+    private double getSelectedSellValue(Player player, Set<Integer> selectedSlots) {
+        double total = 0.0D;
+        for (int playerSlot : selectedSlots) {
+            total += getSellValue(player.getInventory().getItem(playerSlot));
+        }
+        return total;
     }
 
     public double getBuyPrice(String itemPath) {
@@ -237,14 +430,19 @@ public class ShopManager {
 
             for (String itemId : items.getKeys(false)) {
                 String itemPath = "menus." + menuId + ".items." + itemId;
-                if (!shopConfig.isSet(itemPath + ".buy") && shopConfig.isSet(itemPath + ".price")) {
-                    shopConfig.set(itemPath + ".buy", shopConfig.getDouble(itemPath + ".price"));
-                    shopConfig.set(itemPath + ".price", null);
-                    updated = true;
+                if (!shopConfig.isSet(itemPath + ".price")) {
+                    continue;
                 }
 
-                if (!shopConfig.isSet(itemPath + ".sell") && shopConfig.isSet(itemPath + ".buy")) {
-                    shopConfig.set(itemPath + ".sell", calculateDefaultSellPrice(shopConfig.getDouble(itemPath + ".buy")));
+                double legacyPrice = shopConfig.getDouble(itemPath + ".price");
+                if (!shopConfig.isSet(itemPath + ".buy")) {
+                    shopConfig.set(itemPath + ".buy", legacyPrice);
+                }
+                if (!shopConfig.isSet(itemPath + ".sell")) {
+                    shopConfig.set(itemPath + ".sell", calculateDefaultSellPrice(legacyPrice));
+                }
+                if (shopConfig.isSet(itemPath + ".price")) {
+                    shopConfig.set(itemPath + ".price", null);
                     updated = true;
                 }
             }
@@ -263,5 +461,17 @@ public class ShopManager {
 
     private double calculateDefaultSellPrice(double buyPrice) {
         return Math.round(buyPrice * DEFAULT_SELL_MULTIPLIER);
+    }
+
+    private String formatMaterialName(Material material) {
+        String[] words = material.name().toLowerCase(Locale.US).split("_");
+        StringBuilder builder = new StringBuilder();
+        for (String word : words) {
+            if (builder.length() > 0) {
+                builder.append(' ');
+            }
+            builder.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+        }
+        return builder.toString();
     }
 }

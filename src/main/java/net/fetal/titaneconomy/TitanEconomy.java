@@ -65,6 +65,7 @@ public class TitanEconomy extends JavaPlugin {
         // Register Commands
         if (getCommand("balance") != null) getCommand("balance").setExecutor(new BalanceCommand(this));
         if (getCommand("shop") != null) getCommand("shop").setExecutor(new ShopCommand(this));
+        if (getCommand("sell") != null) getCommand("sell").setExecutor(new SellCommand(this));
         if (getCommand("sellhand") != null) getCommand("sellhand").setExecutor(new SellHandCommand(this));
         if (getCommand("pay") != null) getCommand("pay").setExecutor(new PayCommand(this));
         if (getCommand("eco") != null) getCommand("eco").setExecutor(new EcoCommand(this));
