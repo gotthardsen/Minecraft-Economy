@@ -20,7 +20,7 @@ public class PlayerListener implements Listener {
             plugin.getEconomyManager().createAccount(event.getPlayer());
         }
 
-        // 2. Scoreboard Setup (HUD dikhao)
+        // 2. Set up the scoreboard HUD
         plugin.getScoreboardManager().setupScoreboard(event.getPlayer());
     }
 }

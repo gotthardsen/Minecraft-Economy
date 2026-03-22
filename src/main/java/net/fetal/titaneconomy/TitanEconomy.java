@@ -29,6 +29,18 @@ public class TitanEconomy extends JavaPlugin {
         log.info("-------------------------------------------");
 
         saveDefaultConfig();
+        boolean configUpdated = false;
+        if (!getConfig().isSet("scoreboard.header")) {
+            getConfig().set("scoreboard.header", "  &6&lTITAN NETWORK  ");
+            configUpdated = true;
+        }
+        if (!getConfig().isSet("scoreboard.footer")) {
+            getConfig().set("scoreboard.footer", "&6play.titan.com");
+            configUpdated = true;
+        }
+        if (configUpdated) {
+            saveConfig();
+        }
 
         // Initialize Managers
         this.economyManager = new EconomyManager(this);

@@ -43,7 +43,7 @@ main-menu:
       lore: ["&7Otherworldly blocks"]
 
 # --- ITEMS ---
-# Note: 'amount' hata diya hai kyunki ab hum Menu se select karenge (1, 32, 64)
+# Note: 'amount' was removed because players now select quantity in the menu (1, 32, 64).
 menus:
   blocks:
     title: "Shop: Blocks"

@@ -29,8 +29,7 @@ public class ShopManager {
     public final HashMap<Integer, String> categorySlots = new HashMap<>();
     public final HashMap<String, HashMap<Integer, String>> menuItemsCache = new HashMap<>();
     
-    // NEW: Pending Purchase Cache (Player UUID -> Config Path of Item)
-    // Yeh yaad rakhega ki player ne konsa item select kiya hai quantity menu khulne se pehle
+    // Tracks which item a player selected before the quantity menu opens.
     public final HashMap<UUID, String> pendingPurchase = new HashMap<>();
 
     public ShopManager(TitanEconomy plugin) {
@@ -70,7 +69,7 @@ public class ShopManager {
 
     public void openCategory(Player player, String categoryId) {
         String title = shopConfig.getString("menus." + categoryId + ".title", "Shop");
-        Inventory inv = Bukkit.createInventory(null, 54, color(title)); // 54 Slots (Big Page) for more items
+        Inventory inv = Bukkit.createInventory(null, 54, color(title)); // 54 slots for larger item pages
         
         menuItemsCache.putIfAbsent(title, new HashMap<>());
         menuItemsCache.get(title).clear();
@@ -102,14 +101,14 @@ public class ShopManager {
         }
         
         ItemStack back = createGuiItem(Material.ARROW, "&cGo Back", List.of("&7Return to Main Menu"));
-        inv.setItem(49, back); // Bottom Center
+        inv.setItem(49, back); // Bottom center
 
         player.openInventory(inv);
     }
 
-    // --- NEW: QUANTITY SELECTION MENU ---
+    // --- QUANTITY SELECTION MENU ---
     public void openQuantityMenu(Player player, String itemPath) {
-        // Pending purchase mein save karo
+        // Save the selected item so the click handler can complete the purchase.
         pendingPurchase.put(player.getUniqueId(), itemPath);
 
         String itemName = shopConfig.getString(itemPath + ".name", "Item");
