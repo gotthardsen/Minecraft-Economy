@@ -16,6 +16,7 @@ public class TitanEconomy extends JavaPlugin {
     private LevelManager levelManager;
     private ScoreboardManager scoreboardManager;
     private ShopManager shopManager;
+    private SellChestManager sellChestManager;
     private AuctionManager auctionManager; // NEW
     private static Logger log;
 
@@ -38,6 +39,18 @@ public class TitanEconomy extends JavaPlugin {
             getConfig().set("scoreboard.footer", "&6play.titan.com");
             configUpdated = true;
         }
+        if (!getConfig().isSet("settings.sell-chest-interval-minutes")) {
+            getConfig().set("settings.sell-chest-interval-minutes", 3.0);
+            configUpdated = true;
+        }
+        if (!getConfig().isSet("settings.break-drops-at-feet")) {
+            getConfig().set("settings.break-drops-at-feet", true);
+            configUpdated = true;
+        }
+        if (!getConfig().isSet("settings.spawners-drop-themselves")) {
+            getConfig().set("settings.spawners-drop-themselves", true);
+            configUpdated = true;
+        }
         if (configUpdated) {
             saveConfig();
         }
@@ -47,6 +60,7 @@ public class TitanEconomy extends JavaPlugin {
         this.levelManager = new LevelManager(this, economyManager.getDataManager());
         this.scoreboardManager = new ScoreboardManager(this);
         this.shopManager = new ShopManager(this);
+        this.sellChestManager = new SellChestManager(this);
         this.auctionManager = new AuctionManager(this); // NEW
 
         // Vault Hook
@@ -58,6 +72,7 @@ public class TitanEconomy extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new EconomyListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayerListener(this), this);
         getServer().getPluginManager().registerEvents(new ShopListener(this), this);
+        getServer().getPluginManager().registerEvents(new SellChestListener(this), this);
         getServer().getPluginManager().registerEvents(new NoteListener(this), this);
         getServer().getPluginManager().registerEvents(new ChatListener(this), this);
         getServer().getPluginManager().registerEvents(new AuctionListener(this), this); // NEW
@@ -80,6 +95,7 @@ public class TitanEconomy extends JavaPlugin {
     @Override
     public void onDisable() {
         if (economyManager != null) economyManager.saveAllData();
+        if (sellChestManager != null) sellChestManager.shutdown();
         if (auctionManager != null) auctionManager.saveAuctions(); // Save Listings
         log.info("TitanEconomy DISABLED.");
     }
@@ -90,5 +106,6 @@ public class TitanEconomy extends JavaPlugin {
     public LevelManager getLevelManager() { return levelManager; }
     public ScoreboardManager getScoreboardManager() { return scoreboardManager; }
     public ShopManager getShopManager() { return shopManager; }
+    public SellChestManager getSellChestManager() { return sellChestManager; }
     public AuctionManager getAuctionManager() { return auctionManager; } // NEW
 }

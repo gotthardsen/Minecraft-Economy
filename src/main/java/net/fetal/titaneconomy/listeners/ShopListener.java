@@ -90,6 +90,16 @@ public class ShopListener implements Listener {
             if (shopManager.menuItemsCache.containsKey(title)) {
                 if (shopManager.menuItemsCache.get(title).containsKey(slot)) {
                     String itemPath = shopManager.menuItemsCache.get(title).get(slot);
+                    if (!shopManager.canBuy(itemPath)) {
+                        player.sendMessage(Component.text(
+                            shopManager.isUnavailable(itemPath)
+                                ? "This item is currently unavailable."
+                                : "This item cannot be bought from the shop.",
+                            NamedTextColor.RED
+                        ));
+                        player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+                        return;
+                    }
                     shopManager.openQuantityMenu(player, itemPath);
                     player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
                 }
@@ -115,9 +125,19 @@ public class ShopListener implements Listener {
             }
 
             String itemPath = shopManager.pendingPurchase.get(player.getUniqueId());
+            if (!shopManager.canBuy(itemPath)) {
+                shopManager.pendingPurchase.remove(player.getUniqueId());
+                player.sendMessage(Component.text(
+                    shopManager.isUnavailable(itemPath)
+                        ? "This item is currently unavailable."
+                        : "This item cannot be bought from the shop.",
+                    NamedTextColor.RED
+                ));
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+                player.closeInventory();
+                return;
+            }
             double unitPrice = shopManager.getBuyPrice(itemPath);
-            String matName = shopManager.getConfig().getString(itemPath + ".material");
-            Material mat = Material.valueOf(matName);
 
             int amount = 0;
             if (slot == 11) amount = 1;
@@ -126,15 +146,16 @@ public class ShopListener implements Listener {
 
             if (amount > 0) {
                 double finalPrice = unitPrice * amount;
+                ItemStack purchasedItem = shopManager.createPurchasedItem(itemPath, amount);
 
                 if (economyManager.getBalance(player) >= finalPrice) {
-                    if (hasSpace(player, amount)) {
+                    if (hasSpace(player, purchasedItem.getAmount())) {
                         economyManager.withdraw(player, finalPrice);
-                        player.getInventory().addItem(new ItemStack(mat, amount));
+                        player.getInventory().addItem(purchasedItem);
                         shopManager.pendingPurchase.remove(player.getUniqueId());
 
                         player.sendMessage(Component.text("Bought " + amount + "x ", NamedTextColor.GREEN)
-                            .append(Component.text(mat.name(), NamedTextColor.YELLOW))
+                            .append(Component.text(shopManager.getPlainItemName(itemPath), NamedTextColor.YELLOW))
                             .append(Component.text(" for $" + shopManager.formatPrice(finalPrice), NamedTextColor.GREEN)));
                         
                         player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 2.0f);

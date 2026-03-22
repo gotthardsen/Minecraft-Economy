@@ -5,6 +5,9 @@
 settings:
   currency-symbol: "$"
   start-balance: 500.0
+  sell-chest-interval-minutes: 3.0
+  break-drops-at-feet: true
+  spawners-drop-themselves: true
   format-balance: true 
 
 scoreboard:

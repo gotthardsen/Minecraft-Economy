@@ -3,14 +3,18 @@ package net.fetal.titaneconomy.managers;
 import net.fetal.titaneconomy.TitanEconomy;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import org.bukkit.ChatColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.block.CreatureSpawner;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import java.io.File;
@@ -100,10 +104,16 @@ public class ShopManager {
                     double sellPrice = getSellPrice(itemPath);
                     
                     List<String> lore = new ArrayList<>();
-                    lore.add("&7Buy: &a$" + formatPrice(buyPrice));
-                    lore.add("&7Sell: &c$" + formatPrice(sellPrice));
+                    lore.add(canBuy(itemPath) ? "&7Buy: &a$" + formatPrice(buyPrice) : "&7Buy: &cUnavailable");
+                    lore.add(canSell(itemPath) ? "&7Sell: &c$" + formatPrice(sellPrice) : "&7Sell: &cUnavailable");
                     lore.add("");
-                    lore.add("&eClick to Select Quantity");
+                    if (isUnavailable(itemPath)) {
+                        lore.add("&8Unavailable");
+                    } else if (canBuy(itemPath)) {
+                        lore.add("&eClick to Select Quantity");
+                    } else {
+                        lore.add("&cThis item cannot be bought");
+                    }
 
                     ItemStack item = createGuiItem(Material.valueOf(matName), name, lore);
                     inv.setItem(slot, item);
@@ -236,17 +246,25 @@ public class ShopManager {
     }
 
     public boolean isSellable(ItemStack item) {
+        String itemPath = findItemPath(item);
+        if (itemPath == null) {
+            return false;
+        }
+        return canSell(itemPath);
+    }
+
+    public boolean hasShopEntry(ItemStack item) {
         if (item == null || item.getType() == Material.AIR) {
             return false;
         }
-        return findItemPathByMaterial(item.getType()) != null;
+        return findItemPath(item) != null;
     }
 
     public double getSellValue(ItemStack item) {
-        if (!isSellable(item)) {
+        String itemPath = findItemPath(item);
+        if (itemPath == null || !canSell(itemPath)) {
             return 0.0D;
         }
-        String itemPath = findItemPathByMaterial(item.getType());
         return getSellPrice(itemPath) * item.getAmount();
     }
 
@@ -310,18 +328,27 @@ public class ShopManager {
             return null;
         }
 
-        if (!isSellable(item)) {
+        if (!hasShopEntry(item)) {
             return createStatusPane(Material.RED_STAINED_GLASS_PANE, item.getAmount(), "&cCannot Sell", List.of(
-                "&7Item: &f" + formatMaterialName(item.getType()),
+                "&7Item: &f" + getPlainItemName(item),
                 "&7Amount: &f" + item.getAmount(),
                 "",
                 "&cThis item is not in the shop"
             ));
         }
 
+        if (!isSellable(item)) {
+            return createStatusPane(Material.RED_STAINED_GLASS_PANE, item.getAmount(), "&cCannot Sell", List.of(
+                "&7Item: &f" + getPlainItemName(item),
+                "&7Amount: &f" + item.getAmount(),
+                "",
+                "&cSell price is set to $0"
+            ));
+        }
+
         if (selected) {
             return createStatusPane(Material.LIME_STAINED_GLASS_PANE, item.getAmount(), "&aSelected", List.of(
-                "&7Item: &f" + formatMaterialName(item.getType()),
+                "&7Item: &f" + getPlainItemName(item),
                 "&7Amount: &f" + item.getAmount(),
                 "&7Total Sell Value: &a$" + formatPrice(getSellValue(item)),
                 "",
@@ -337,7 +364,7 @@ public class ShopManager {
                 lore.addAll(meta.lore());
                 lore.add(color(""));
             }
-            lore.add(color("&7Sell Each: &c$" + formatPrice(getSellPrice(findItemPathByMaterial(item.getType())))));
+            lore.add(color("&7Sell Each: &c$" + formatPrice(getSellPrice(item))));
             lore.add(color("&7Total Sell Value: &a$" + formatPrice(getSellValue(item))));
             lore.add(color(""));
             lore.add(color("&eClick to select this slot"));
@@ -368,6 +395,63 @@ public class ShopManager {
         return total;
     }
 
+    public String getConfiguredItemName(String itemPath) {
+        return shopConfig.getString(itemPath + ".name", "Item");
+    }
+
+    public String getPlainItemName(String itemPath) {
+        return ChatColor.stripColor(LegacyComponentSerializer.legacySection().serialize(color(getConfiguredItemName(itemPath))));
+    }
+
+    public String getPlainItemName(ItemStack item) {
+        if (item == null || item.getType() == Material.AIR) {
+            return "Item";
+        }
+        String itemPath = findItemPath(item);
+        if (itemPath != null) {
+            return getPlainItemName(itemPath);
+        }
+        return formatMaterialName(item.getType());
+    }
+
+    public Material getItemMaterial(String itemPath) {
+        return Material.valueOf(shopConfig.getString(itemPath + ".material", "STONE"));
+    }
+
+    public ItemStack createPurchasedItem(String itemPath, int amount) {
+        Material material = getItemMaterial(itemPath);
+        if (plugin.getSellChestManager() != null && plugin.getSellChestManager().isSellChestItemPath(itemPath)) {
+            return plugin.getSellChestManager().createSellChestItem(amount, getConfiguredItemName(itemPath));
+        }
+
+        if (material == Material.SPAWNER) {
+            EntityType configuredSpawnerType = getConfiguredSpawnerType(itemPath);
+            if (configuredSpawnerType != null) {
+                return createSpawnerItem(configuredSpawnerType, amount);
+            }
+        }
+
+        return new ItemStack(material, amount);
+    }
+
+    public ItemStack createSpawnerItem(EntityType spawnerType, int amount) {
+        ItemStack item = new ItemStack(Material.SPAWNER, Math.max(1, amount));
+        applySpawnerType(item, spawnerType);
+        return item;
+    }
+
+    public boolean canBuy(String itemPath) {
+        return getBuyPrice(itemPath) > 0.0D;
+    }
+
+    public boolean canSell(String itemPath) {
+        return getSellPrice(itemPath) > 0.0D;
+    }
+
+    public boolean isUnavailable(String itemPath) {
+        return !canBuy(itemPath) && !canSell(itemPath);
+    }
+
     public double getBuyPrice(String itemPath) {
         if (shopConfig.isSet(itemPath + ".buy")) {
             return shopConfig.getDouble(itemPath + ".buy");
@@ -380,6 +464,14 @@ public class ShopManager {
             return shopConfig.getDouble(itemPath + ".sell");
         }
         return calculateDefaultSellPrice(getBuyPrice(itemPath));
+    }
+
+    public double getSellPrice(ItemStack item) {
+        String itemPath = findItemPath(item);
+        if (itemPath == null) {
+            return 0.0D;
+        }
+        return getSellPrice(itemPath);
     }
 
     public String formatPrice(double price) {
@@ -410,6 +502,25 @@ public class ShopManager {
         }
 
         return null;
+    }
+
+    public String findItemPath(ItemStack item) {
+        if (item == null || item.getType() == Material.AIR) {
+            return null;
+        }
+
+        if (plugin.getSellChestManager() != null && plugin.getSellChestManager().isSellChestItem(item)) {
+            String sellChestItemPath = plugin.getSellChestManager().getShopItemPath();
+            if (shopConfig.isSet(sellChestItemPath + ".material")) {
+                return sellChestItemPath;
+            }
+        }
+
+        if (item.getType() == Material.SPAWNER) {
+            return findSpawnerItemPath(item);
+        }
+
+        return findItemPathByMaterial(item.getType());
     }
 
     public FileConfiguration getConfig() { return shopConfig; }
@@ -461,6 +572,85 @@ public class ShopManager {
 
     private double calculateDefaultSellPrice(double buyPrice) {
         return Math.round(buyPrice * DEFAULT_SELL_MULTIPLIER);
+    }
+
+    private void applySpawnerType(ItemStack item, EntityType spawnerType) {
+        if (item.getType() != Material.SPAWNER || spawnerType == null) {
+            return;
+        }
+
+        ItemMeta meta = item.getItemMeta();
+        if (!(meta instanceof BlockStateMeta blockStateMeta)) {
+            return;
+        }
+
+        if (!(blockStateMeta.getBlockState() instanceof CreatureSpawner spawner)) {
+            return;
+        }
+
+        spawner.setSpawnedType(spawnerType);
+        blockStateMeta.setBlockState(spawner);
+        item.setItemMeta(blockStateMeta);
+    }
+
+    private String findSpawnerItemPath(ItemStack item) {
+        EntityType itemSpawnerType = getSpawnerType(item);
+        if (itemSpawnerType == null) {
+            return null;
+        }
+
+        ConfigurationSection menus = shopConfig.getConfigurationSection("menus");
+        if (menus == null) {
+            return null;
+        }
+
+        for (String menuId : menus.getKeys(false)) {
+            ConfigurationSection items = shopConfig.getConfigurationSection("menus." + menuId + ".items");
+            if (items == null) {
+                continue;
+            }
+
+            for (String itemId : items.getKeys(false)) {
+                String itemPath = "menus." + menuId + ".items." + itemId;
+                if (!Material.SPAWNER.name().equalsIgnoreCase(shopConfig.getString(itemPath + ".material"))) {
+                    continue;
+                }
+
+                EntityType configuredSpawnerType = getConfiguredSpawnerType(itemPath);
+                if (configuredSpawnerType == itemSpawnerType) {
+                    return itemPath;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private EntityType getConfiguredSpawnerType(String itemPath) {
+        String spawnerType = shopConfig.getString(itemPath + ".spawner-type");
+        if (spawnerType == null || spawnerType.isBlank()) {
+            return null;
+        }
+
+        try {
+            return EntityType.valueOf(spawnerType.toUpperCase(Locale.US));
+        } catch (IllegalArgumentException ignored) {
+            plugin.getLogger().warning("Invalid spawner type in shops.yml: " + spawnerType + " at " + itemPath);
+            return null;
+        }
+    }
+
+    private EntityType getSpawnerType(ItemStack item) {
+        ItemMeta meta = item.getItemMeta();
+        if (!(meta instanceof BlockStateMeta blockStateMeta)) {
+            return null;
+        }
+
+        if (!(blockStateMeta.getBlockState() instanceof CreatureSpawner spawner)) {
+            return null;
+        }
+
+        return spawner.getSpawnedType();
     }
 
     private String formatMaterialName(Material material) {

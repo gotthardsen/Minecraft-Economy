@@ -39,7 +39,7 @@ public class SellHandCommand implements CommandExecutor {
         }
 
         int amount = player.getInventory().getItem(heldSlot).getAmount();
-        String itemName = player.getInventory().getItem(heldSlot).getType().name();
+        String itemName = shopManager.getPlainItemName(player.getInventory().getItem(heldSlot));
         double total = shopManager.sellInventorySlot(player, heldSlot);
         if (total <= 0.0D) {
             player.sendMessage(Component.text("This item cannot be sold to the shop.", NamedTextColor.RED));

@@ -513,6 +513,40 @@ menus:
         name: '&5Ender Chest'
         buy: 500.0
         sell: 100.0
+      sell_chest:
+        material: CHEST
+        slot: 6
+        name: '&6Auto Sell Chest'
+        buy: 10000.0
+        sell: 2000.0
+      zombie_spawner:
+        material: SPAWNER
+        spawner-type: ZOMBIE
+        slot: 12
+        name: '&aZombie Spawner'
+        buy: 1000.0
+        sell: 200.0
+      skeleton_spawner:
+        material: SPAWNER
+        spawner-type: SKELETON
+        slot: 13
+        name: '&fSkeleton Spawner'
+        buy: 1000.0
+        sell: 200.0
+      spider_spawner:
+        material: SPAWNER
+        spawner-type: SPIDER
+        slot: 14
+        name: '&8Spider Spawner'
+        buy: 1000.0
+        sell: 200.0
+      creeper_spawner:
+        material: SPAWNER
+        spawner-type: CREEPER
+        slot: 15
+        name: '&2Creeper Spawner'
+        buy: 1000.0
+        sell: 200.0
       beacon:
         material: BEACON
         slot: 8
